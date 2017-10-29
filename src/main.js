@@ -55,8 +55,6 @@ const executeScenario = (msgdata) => {
   }
 }
 const generateColor = (color) => {
-  if (color)
-    return `#${color}`;
   const getHex = () => Math.floor(Math.random() * 16).toString(16);
   color = [];
   let i = 3;
@@ -68,7 +66,7 @@ const generateColor = (color) => {
 }
 const handleConnection = (socket, req) => {
   const token = QS.parse(req.url.slice(2)).token;
-  const color = (token.match(/^([0-9]|[A-F]){3}$/)) ? generateColor(token) : generateColor(); //Если имя позволяет сгенерировать из него цвет, то почему бы и нет
+  const color = (token.match(/^([0-9]|[A-F]){3}$/)) ? `#${token}` : generateColor(); //Если имя позволяет сгенерировать из него цвет, то почему бы и нет
   try {
     const data = {
       state: gameInstance.state,
