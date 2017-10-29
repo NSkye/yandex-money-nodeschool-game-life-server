@@ -29,13 +29,11 @@ const gameInstance = new LifeGameVirtualDom();
 gameInstance.sendUpdates = data => {
   const type = "UPDATE_STATE";
   try {
-    let i = socket.clients.length;
-    while (socket.clients[i]) {
-      if(clients[i].readyState === WS.OPEN) {
-        clients[i].send(JSON.stringify({type, data}));
+    socket.clients.forEach(client => {
+      if (client.readyState === WS.OPEN) {
+        client.send(JSON.stringify({type, data}));
       }
-      i--;
-    }
+    });
   } catch (e) {
     console.log(e.message);
   }
