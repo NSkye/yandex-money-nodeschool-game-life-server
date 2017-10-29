@@ -20,6 +20,7 @@
 //
 // Nyan cat lies here...
 //
+const QS = require('querystring');
 const WS = require('ws');
 const LifeGameVirtualDom = require('../lib/LifeGameVirtualDom');
 
@@ -39,12 +40,20 @@ gameInstance.sendUpdates = data => {
   }
 };
 
-const types = {
-  'ADD_POINT': data => {
-    gameInstance.applyUpdates(data);
+const executeScenario = (msgdata) => {
+  const allowedTypes = ['ADD_POINT'];
+  const type = msgdata.type;
+  const data = msgdata.data;
+  switch (type) {
+    case 'ADD_POINT':
+      if (!data)
+        throw new Error(`Message data error. No data.`);
+      gameInstance.applyUpdates(data);
+      break;
+    default:
+      throw new Error(`Message type error. Expected one of following types: ${allowedTypes}; got: ${type}`);
   }
 }
-
 const generateColor = (color) => {
   if (color)
     return `#${color}`;
@@ -57,20 +66,8 @@ const generateColor = (color) => {
   }
   return `#${color.join('')}`
 }
-
-const parseInternalURL = (url, parameter) => {
-  const params = {};
-  url.replace('/?', '').split('&').map(a => {a = a.split('='), params[a[0]]=a[1]});
-  if (parameter) {
-    if (!params.hasOwnProperty(parameter))
-      throw new Error(`Parameter ${parameter} not found`);
-    return params[parameter];
-  }
-  return params;
-}
-
-socket.on("connection", (socket, req) => {
-  const token = parseInternalURL(req.url, 'token');
+const handleConnection = (socket, req) => {
+  const token = QS.parse(req.url.slice(2)).token;
   const color = (token.match(/^([0-9]|[A-F]){3}$/)) ? generateColor(token) : generateColor(); //Если имя позволяет сгенерировать из него цвет, то почему бы и нет
   try {
     const data = {
@@ -82,17 +79,15 @@ socket.on("connection", (socket, req) => {
   } catch (e) {
     console.log(e.message);
   }
-
-  socket.on("message", msg => {
+  const handleMessage = msg => {
     try {
       const msgdata = JSON.parse(msg);
-      if (!types[msgdata.type])
-        throw new Error(`Message type error. Expected one of following types: ${Object.keys(types)}; got: ${msgdata.type}`);
-      if (!msgdata.data)
-        throw new Error(`Message data error. No data.`)
-      types[msgdata.type](msgdata.data);
+      executeScenario(msgdata);
     } catch (e) {
       return console.log(e.message);
     }
-  });
-});
+  }
+  socket.on("message", handleMessage);
+}
+
+socket.on("connection", handleConnection);
