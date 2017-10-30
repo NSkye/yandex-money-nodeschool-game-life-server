@@ -28,9 +28,6 @@ const io = require('socket.io')(server, {
   transport: ['websocket'],
   path: '/'
 });
-app.use(ctx => {
-  ctx.body = 'sry, websockets only :c'
-});
 
 const applyGameUpdates = data => {
   if (!data)
