@@ -32,15 +32,19 @@ app.use(ctx => {
   ctx.body = 'sry, websockets only :c'
 });
 
+const applyGameUpdates = data => {
+  if (!data)
+    throw new Error(`Message data error: no data`);
+  gameInstance.applyUpdates(data);
+}
+
 const executeScenario = message => {
   const allowedTypes = ['ADD_POINT'];
   const type = message.type;
   const data = message.data;
   switch (type) {
     case 'ADD_POINT':
-      if (!data)
-        throw new Error(`Message data error: no data`);
-      gameInstance.applyUpdates(data);
+      applyGameUpdates(data);
       break;
     default:
       throw new Error(`Message type error: expected one of types ${allowedTypes}; got: ${type}`);
