@@ -29,7 +29,7 @@ class LifeGameServer extends LifeGameVirtualDom {
     super();
     this.server = http.createServer(this.requestHandler);
     this.io = socket_io(this.server, {
-      transport: ['websocket'],
+      transports: ['websocket'],
       path: '/'
     });
     if (auth) {
@@ -72,36 +72,39 @@ class LifeGameServer extends LifeGameVirtualDom {
     }
   }
 
-  generateColor() {
-    return '#'+[0,0,0].map(rgb => Math.floor(Math.random() * 16).toString(16)).join('');
+  initializeGameOnClient(socket, token, color) {
+    const data = {
+      state: this.state,
+      settings: this.settings,
+      user: {token, color}
+    };
+    try {
+      socket.emit('message', {type: 'INITIALIZE', data});
+    } catch (e) {
+      console.log(e.message);
+    }
+  }
+
+  handleMessage(msg) {
+      try {
+        this.executeScenario(msg);
+      } catch (e) {
+        console.log(e.message);
+      }
   }
 
   bindListeners() {
     this.io.on('connection', socket => {
       const token = socket.handshake.query.token;
       const color = (token.match(/^([0-9]|[A-F]){3}$/)) ? `#${token}` : this.generateColor();
-      const data = {
-        state: this.state,
-        settings: this.settings,
-        user: {token, color}
-      };
-
-      socket.on('message', msg => {
-        try {
-          this.executeScenario(msg);
-        } catch (e) {
-          console.log(e.message);
-        }
-      });
-
+      socket.on('message', this.handleMessage.bind(this));
+      this.initializeGameOnClient(socket, token, color);
       console.log(`Someone connected. Token: ${token}`);
-
-      try {
-        socket.emit('message', {type: 'INITIALIZE', data});
-      } catch (e) {
-        console.log(e.message);
-      }
     });
+  }
+
+  generateColor() {
+    return '#'+[0,0,0].map(rgb => Math.floor(Math.random() * 16).toString(16)).join('');
   }
 }
 
