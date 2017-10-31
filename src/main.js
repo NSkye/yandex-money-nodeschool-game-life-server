@@ -29,7 +29,7 @@ class LifeGameServer extends LifeGameVirtualDom {
     super();
     this.server = http.createServer(this.requestHandler);
     this.io = socket_io(this.server, {
-      transport: ['websocket'],
+      transports: ['websocket'],
       path: '/'
     });
     if (auth) {
