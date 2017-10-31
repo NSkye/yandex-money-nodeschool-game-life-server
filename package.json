@@ -15,7 +15,6 @@
     "url": "git@github.com:NikitaRudenko/yandex-money-nodeschool-game-life-client.git"
   },
   "dependencies": {
-    "koa": "^2.3.0",
     "socket.io": "^2.0.4",
     "ws": "^3.2.0"
   }
