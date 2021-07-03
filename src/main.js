@@ -20,72 +20,92 @@
 //
 // Nyan cat lies here...
 //
-const QS = require('querystring');
-const WS = require('ws');
 const LifeGameVirtualDom = require('../lib/LifeGameVirtualDom');
+const http = require('http');
+const socket_io = require('socket.io');
 
-const socket = new WS.Server({port: 3001});
-
-const gameInstance = new LifeGameVirtualDom();
-gameInstance.sendUpdates = data => {
-  const type = "UPDATE_STATE";
-  try {
-    socket.clients.forEach(client => {
-      if (client.readyState === WS.OPEN) {
-        client.send(JSON.stringify({type, data}));
-      }
+class LifeGameServer extends LifeGameVirtualDom {
+  constructor(port, auth) {
+    super();
+    this.server = http.createServer(this.requestHandler);
+    this.io = socket_io(this.server, {
+      transports: ['websocket'],
+      path: '/'
     });
-  } catch (e) {
-    console.log(e.message);
+    if (auth) {
+      this.enableAuthentification();
+    }
+    this.bindListeners();
+    this.server.listen(port);
   }
-};
 
-const executeScenario = (msgdata) => {
-  const allowedTypes = ['ADD_POINT'];
-  const type = msgdata.type;
-  const data = msgdata.data;
-  switch (type) {
-    case 'ADD_POINT':
-      if (!data)
-        throw new Error(`Message data error. No data.`);
-      gameInstance.applyUpdates(data);
-      break;
-    default:
-      throw new Error(`Message type error. Expected one of following types: ${allowedTypes}; got: ${type}`);
+  requestHandler(req, res) {
+    res.writeHead(200);
   }
-}
-const generateColor = (color) => {
-  const getHex = () => Math.floor(Math.random() * 16).toString(16);
-  color = [];
-  let i = 3;
-  while(i) {
-    color.push(getHex());
-    i--;
+
+  enableAuthentification() {
+    this.io.use((socket, next) => {
+      if (socket.handshake.query.token) {
+        return next();
+      }
+      console.log('Refused connection: no token');
+      next(new Error('Authentification error'));
+    });
   }
-  return `#${color.join('')}`
-}
-const handleConnection = (socket, req) => {
-  const token = QS.parse(req.url.slice(2)).token;
-  const color = (token.match(/^([0-9]|[A-F]){3}$/)) ? `#${token}` : generateColor(); //Если имя позволяет сгенерировать из него цвет, то почему бы и нет
-  try {
-    const data = {
-      state: gameInstance.state,
-      settings: gameInstance.settings,
-      user: {token, color}
-    };
-    socket.send(JSON.stringify({type: 'INITIALIZE', data}));
-  } catch (e) {
-    console.log(e.message);
-  }
-  const handleMessage = msg => {
+
+  sendUpdates(data) {
+    const type = 'UPDATE_STATE';
     try {
-      const msgdata = JSON.parse(msg);
-      executeScenario(msgdata);
+      this.io.emit('message', {type, data});
     } catch (e) {
-      return console.log(e.message);
+      console.log(e.message);
     }
   }
-  socket.on("message", handleMessage);
+
+  executeScenario(msg) {
+    switch (msg.type) {
+      case 'ADD_POINT':
+        this.applyUpdates(msg.data);
+        break;
+      default:
+        throw new Error(`Message type error: invalid message type ${msg.type}`);
+    }
+  }
+
+  initializeGameOnClient(socket, token, color) {
+    const data = {
+      state: this.state,
+      settings: this.settings,
+      user: {token, color}
+    };
+    try {
+      socket.emit('message', {type: 'INITIALIZE', data});
+    } catch (e) {
+      console.log(e.message);
+    }
+  }
+
+  handleMessage(msg) {
+      try {
+        this.executeScenario(msg);
+      } catch (e) {
+        console.log(e.message);
+      }
+  }
+
+  bindListeners() {
+    this.io.on('connection', socket => {
+      const token = socket.handshake.query.token;
+      const color = (token.match(/^([0-9]|[A-F]){3}$/)) ? `#${token}` : this.generateColor();
+      socket.on('message', this.handleMessage.bind(this));
+      this.initializeGameOnClient(socket, token, color);
+      console.log(`Someone connected. Token: ${token}`);
+    });
+  }
+
+  generateColor() {
+    return '#'+[0,0,0].map(rgb => Math.floor(Math.random() * 16).toString(16)).join('');
+  }
 }
 
-socket.on("connection", handleConnection);
+new LifeGameServer(3001, true);
